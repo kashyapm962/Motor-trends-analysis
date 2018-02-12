@@ -1,0 +1,174 @@
+---
+title: "Motor Trends"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+##Executive Summary
+In this report, we look at a data set of a collection of car, and are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). Particularly, we are interested in the following two questions:
+
+    “Is an automatic or manual transmission better for MPG”
+    “Quantify the MPG difference between automatic and manual transmissions”
+
+In order to answer these two questions, we follow the steps below:
+
+    Load and process the data such that it makes more sense
+    Conduct a basic exploratory data analyses to show the relationship between mpg and am
+    Fit multiple models to the data and select the best model
+    Diagnose the model and quantify the uncertainty
+    Using the model we choose, draw conclusion and answer the questions
+
+###Libraries Required
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+require(ggplot2)
+require(dplyr)
+require(reshape2)
+```
+
+###Dataset
+```{r}
+data(mtcars)
+head(mtcars)
+```
+```{r}
+str(mtcars)
+```
+###Deriving the Corelation between the variables 
+```{r}
+corMatrix <- round(cor(mtcars), 2)
+corMatrix
+```
+
+```{r}
+meltedCorMatrix <- melt(corMatrix)
+head(meltedCorMatrix)
+
+```
+
+```{r}
+G <- ggplot(data = meltedCorMatrix, aes(x = Var1, y =Var2, fill = value)) + 
+     geom_tile() + 
+     scale_fill_gradient2(low="Maroon", high="navy Blue", guide="colorbar")
+G
+```
+
+
+
+###Changing some variables to factor since they repersent cagtegories not continous values
+```{r}
+mtcars$vs <- factor(mtcars$vs)
+mtcars$am <- factor(mtcars$am)
+mtcars$carb <- factor(mtcars$carb)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$cyl <- factor(mtcars$cyl)
+str(mtcars)
+```
+
+
+
+##EDA
+###Relationship between mpg(miles per gallon) and am(transmission)
+```{r}
+levels(mtcars$am) <- c("automatic", "manual")
+fill <- "#4271AE"
+line <- "#1F3552"
+qplot(x= mtcars$am, y= mtcars$mpg, geom = "boxplot") + 
+    ylab("Miles/(US)gallon") + 
+    xlab("Transmission") +
+    geom_boxplot(fill = fill, colour = line)+ 
+    theme_bw() +
+    
+    geom_jitter(width = 0.2)
+```
+From the above Boxplot we can eaisly understand that, there is a diffrence between two groups, and cars with manual transmission have higher mpg so that of automatic transmission
+
+###Relationship between mpg(miles per gallon) and cyl(Number of cylinders)
+```{r}
+ggplot(mtcars, aes(cyl, mpg)) +
+    geom_boxplot() +
+    geom_boxplot(fill = fill, colour = line)+ 
+    theme_bw() +
+    geom_jitter(width = 0.2)
+
+```
+
+Relationship of mpg with other variable having caorelation value nearby 1 and -1
+```{r message=TRUE, warning=FALSE}
+par(mfrow= c(2,2))
+plot(mtcars$mpg, mtcars$disp)
+plot(mtcars$mpg, mtcars$wt, data= mtcars)
+plot(mtcars$mpg, mtcars$hp, data= mtcars)
+plot(mtcars$mpg, mtcars$drat, data= mtcars)
+```
+```{r}
+plot(mtcars)
+```
+
+##Model Buliding and Selection
+###Model with single variable
+starting with basic model in which it depends on variable am(Transmission)
+```{r}
+basicModel <- lm(mpg~am, data = mtcars)
+summary(basicModel)
+```
+From the summary we can clearly see that <b>Cars</b> with automatic Transmission have more mileage (mpg) having a average of 17.147, wheras in cas of Manual Transmission average is 7.245.
+<b> The <strong> p-value</strong> is low (~0.000285), and R-squared value is 0.3385</b>, Which means that model can explain only 33.85% of mpg variability.
+Hence we need more variable take into account.
+###Considring all variable for our model
+```{r}
+Full_fledgedModel <- lm(mpg~., data = mtcars)
+summary(Full_fledgedModel)
+```
+Here we have increase in R-squared value whichis now .779, here to improve our model efficency we will remove some insignificant model.
+We will use variable from our heapmap with correlation valu emore close to -1 and 1
+```{r}
+fit1 <- lm(mpg~wt+ am + cyl + disp  + hp+ drat, data =mtcars)
+summary(fit1)
+
+```
+R-squared value(~0.8278) increased, means our model is now improves version of previous one
+Now trying to make this model more efficent by removing or adding some variable
+```{r}
+fit2 <- lm(mpg~wt+ am + cyl  + hp  , data =mtcars)
+summary(fit2)
+```
+```{r}
+fit3 <- lm(mpg~wt+ am + cyl + disp  + hp , data =mtcars)
+summary(fit3)
+```
+From above three model we have R-squared value as following
+fit1 :- 0.8278
+fit2 :- 0.8401
+fit3 :- 0.8344 
+So our best fit model is <b>fit2</b> with  p-value: 1.506e-10 le   ss than 5% and with least Residual standard error 2.41 on 26 degrees of freedom
+
+###Let’s plot the diagnosis of the model.
+```{r}
+par(mfrow = c(2, 2))
+plot(fit2)
+
+```
+From the above plots, we can make the following observations,
+
+   The points in the Residuals vs. Fitted plot seem to be randomly scattered on the plot and       verify the independence condition.
+   The Normal Q-Q plot consists of the points which mostly fall on the line indicating that the residuals are normally distributed.
+   The Scale-Location plot consists of points scattered in a constant band pattern, indicating constant variance.
+   There are some distinct points of interest (outliers or leverage points) in the top right of the plots.
+   We now compute some regression diagnostics of our model to find out these interesting leverage points as shown in the following section. We compute top three points in each case of influence measures.
+   
+###Infrence 
+We can also conduct a T-test to confirm our observation. Define the null hypothesis as manual and automatic transmissions result in the same mpg.
+```{r}
+t.test(mpg ~ am, data = mtcars)
+```
+P-value is 0.00137, and confidence interval does not include zero, so we reject the null hypothesis and accept the difference in mpg between manual and automatic transmission, which we observed earlier.
+
+##Conclusion
+Based on the observations from our best fit model, we can conclude the following,
+
+1. Cars with Manual transmission get more miles per gallon compared aganist cars with Automatic transmission. (1.8 adjusted by hp, cyl, and wt). mpg will decrease by 2.5 (adjusted by hp, cyl, and am) for every 1000 lb increase in wt.
+2. mpg decreases negligibly with increase of hp.
+3. If number of cylinders, cyl increases from 4 to 6 and 8, mpg will decrease by a factor of 3 and 2.2 respectively (adjusted by hp, wt, and am).
+
+
